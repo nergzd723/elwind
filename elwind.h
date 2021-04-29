@@ -3,9 +3,17 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <SDL2/SDL.h>
+
+#define PIXEL_SIZE 4 // ARGB, 4 bytes
 
 #define PC_START 0x100
 #define ROM_SIZE 0x8000
+
+#define LCDC_Y 0x44
+#define SIZE_X 144
+#define SIZE_Y 160
+
 #define FLAG_ZERO 7
 #define FLAG_NEGATIVE 6
 #define FLAG_HC 5
@@ -35,8 +43,17 @@ typedef struct {
 } ElwindMemory;
 
 typedef struct {
+    char Tiles[256][16];
+    SDL_Window* window;
+    SDL_Renderer* renderer;
+    SDL_Texture* texture;
+    uint8_t Framebuffer[160*144*4];
+} ElwindRenderer;
+
+typedef struct {
     ElwindRegisters registers;
     ElwindMemory memory;
+    ElwindRenderer renderer;
 } ElwindMachine;
 
 typedef struct {
@@ -45,8 +62,21 @@ typedef struct {
     void (*Execute)(ElwindMachine*);
 } ElwindInstruction;
 
+enum Shade{
+    SHADE_WHITE,
+    SHADE_LIGHT_GREY,
+    SHADE_DARK_GREY,
+    SHADE_BLACK
+};
+
 extern const ElwindInstruction Instructions[256];
 
 static char broken;
-static char stopped;
+static char stopped = 1;
+
+void FillTileCache(ElwindMachine* machine);
+void PrintTile(ElwindMachine* machine, uint8_t tileno);
+int InitSDL2(ElwindMachine* machine);
+void DrawTileAt(ElwindMachine* machine, uint8_t tileno, uint16_t xoff, uint16_t yoff);
+
 #endif

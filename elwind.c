@@ -5,6 +5,10 @@
 
 ElwindMachine Machine;
 
+void InitializeHardware(){
+    Machine.memory.IOMemory[LCDC_Y] = 0x91;
+}
+
 ElwindInstruction FetchInstruction(){
     uint8_t instructionByte = Machine.memory.Memory[Machine.registers.pc];
     ElwindInstruction Instruction = Instructions[instructionByte];
@@ -35,6 +39,15 @@ void Process(){
 
 void break_ctrl_c(int signal){
     stopped = 1;
+}
+
+void die(int signal){
+    printf("Exiting\n");
+    if (Machine.renderer.window){
+        SDL_DestroyWindow(Machine.renderer.window);
+        SDL_Quit();
+    }
+    exit(0);
 }
 
 void mainloop(){
@@ -70,18 +83,42 @@ void mainloop(){
                 printf("sp: 0x%x\n", Machine.registers.sp);
                 printf("pc: 0x%x\n", Machine.registers.pc);
             }
+            if (!strcmp(buffer, "dvram\n")) {
+                FILE* vram = fopen("vram.bin", "wb+");
+                for (int c = 0; c < 0x2000; c++){
+                    fputc(Machine.memory.VRAM[c], vram);
+                }
+                printf("Crashdump done!\n");
+            }
         }
         else Process();
+        FillTileCache(&Machine);
     }
+    FillTileCache(&Machine);
+    PrintTile(&Machine, 0x65);
+    for (int i = 0; i < 8; i++){
+        DrawTileAt(&Machine, i+0x65, (i*8), 0);
+    }
+    FILE* vram = fopen("vram.bin", "wb+");
+    for (int c = 0; c < 0x2000; c++){
+        fputc(Machine.memory.VRAM[c], vram);
+    }
+    printf("Crashdump done!\n");
 }
 
 int main(int argc, char** argv){
     Machine.registers.pc = PC_START;
     FILE* ROMHandle;
-    ROMHandle = fopen("drmario.gb", "r");
+    ROMHandle = fopen("hello-world.gb", "r");
     fread(Machine.memory.Memory, sizeof(char), ROM_SIZE, ROMHandle);
     printf("Loaded first 32KiB of ROM into machine's memory\n");
     signal(SIGINT, break_ctrl_c);
+    signal(SIGTSTP, die);
+    InitializeHardware();
+    if (InitSDL2(&Machine)){
+        printf("Broken!\n");
+        return 0;
+    }
     mainloop();
     printf("Broken!\n");
     return 0;

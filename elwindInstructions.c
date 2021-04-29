@@ -8,7 +8,7 @@ uint8_t memory_readb(ElwindMachine* machine, uint16_t address){
         return machine->memory.OAM[address - 0xFE00];
     }
     if (address >= 0xFF00 && address <= 0xFF7F){
-        return machine->memory.VRAM[address - 0xFF00];
+        return machine->memory.IOMemory[address - 0xFF00];
     }
     return machine->memory.Memory[address];
 }
@@ -21,7 +21,7 @@ void memory_writeb(ElwindMachine* machine, uint16_t address, uint8_t val){
         machine->memory.OAM[address - 0xFE00] = val;
     }
     if (address >= 0xFF00 && address <= 0xFF7F){
-        machine->memory.VRAM[address - 0xFF00] = val;
+        machine->memory.IOMemory[address - 0xFF00] = val;
     }
     machine->memory.Memory[address] = val;
 }
@@ -52,9 +52,54 @@ uint16_t get_hl_helper(ElwindMachine* machine){
     return (machine->registers.h << 8) | machine->registers.l;
 }
 
+void set_de_helper(ElwindMachine* machine, uint16_t value){
+    machine->registers.d = (value & 0xFF00) >> 8;
+    machine->registers.e = value & 0xFF;
+}
+
+uint16_t get_de_helper(ElwindMachine* machine){
+    return (machine->registers.d << 8) | machine->registers.e;
+}
+
+void set_bc_helper(ElwindMachine* machine, uint16_t value){
+    machine->registers.b = (value & 0xFF00) >> 8;
+    machine->registers.c = value & 0xFF;
+}
+
+uint16_t get_bc_helper(ElwindMachine* machine){
+    return (machine->registers.b << 8) | machine->registers.c;
+}
+
 void dec_helper(ElwindMachine* machine, uint8_t* targetRegister){
     *targetRegister = *targetRegister - 1;
     if (*targetRegister == UINT8_MAX){
+        machine->registers.f |= BIT(FLAG_CARRY);
+    }
+    else machine->registers.f &= ~(BIT(FLAG_CARRY));
+    zero_helper(machine, *targetRegister);
+}
+
+void dec_helper_16(ElwindMachine* machine, uint16_t* targetRegister){
+    *targetRegister = *targetRegister - 1;
+    if (*targetRegister == UINT16_MAX){
+        machine->registers.f |= BIT(FLAG_CARRY);
+    }
+    else machine->registers.f &= ~(BIT(FLAG_CARRY));
+    zero_helper(machine, *targetRegister);
+}
+
+void inc_helper(ElwindMachine* machine, uint8_t* targetRegister){
+    *targetRegister = *targetRegister + 1;
+    if (*targetRegister == 0){
+        machine->registers.f |= BIT(FLAG_CARRY);
+    }
+    else machine->registers.f &= ~(BIT(FLAG_CARRY));
+    zero_helper(machine, *targetRegister);
+}
+
+void inc_helper_16(ElwindMachine* machine, uint16_t* targetRegister){
+    *targetRegister = *targetRegister + 1;
+    if (*targetRegister == 0){
         machine->registers.f |= BIT(FLAG_CARRY);
     }
     else machine->registers.f &= ~(BIT(FLAG_CARRY));
@@ -80,12 +125,38 @@ void jr_nz_n(ElwindMachine* machine){
     }
 }
 
+void jr_n(ElwindMachine* machine){
+    if (n_helper(machine) == 0xFE){
+        stopped = 1;
+        printf("Infinite loop detected\n");
+    }
+    else machine->registers.pc += ((n_helper(machine) ^ 0x80) - 0x80);
+}
+
+void jr_c_n(ElwindMachine* machine){
+    if (machine->registers.f & BIT(FLAG_CARRY)){
+        machine->registers.pc += ((n_helper(machine) ^ 0x80) - 0x80);
+    }
+}
+
 void ld_hl_nn(ElwindMachine* machine){
     set_hl_helper(machine, nn_helper(machine));
 }
 
+void ld_de_nn(ElwindMachine* machine){
+    set_de_helper(machine, nn_helper(machine));
+}
+
+void ld_bc_nn(ElwindMachine* machine){
+    set_bc_helper(machine, nn_helper(machine));
+}
+
 void ld_a_n(ElwindMachine* machine){
     machine->registers.a = n_helper(machine);
+}
+
+void ld_a_b(ElwindMachine* machine){
+    machine->registers.a = machine->registers.b;
 }
 
 void ld_b_n(ElwindMachine* machine){
@@ -96,16 +167,20 @@ void ld_c_n(ElwindMachine* machine){
     machine->registers.c = n_helper(machine);
 }
 
+void ld_a_de(ElwindMachine* machine){
+    machine->registers.a = memory_readb(machine, get_de_helper(machine));
+}
+
 void ld_nn_a(ElwindMachine* machine){
     memory_writeb(machine, nn_helper(machine), machine->registers.a);
 }
 
 void ldh_n_a(ElwindMachine* machine){
-    memory_writeb(machine, n_helper(machine), machine->registers.a);
+    memory_writeb(machine, 0xFF00 + n_helper(machine), machine->registers.a);
 }
 
 void ldh_a_n(ElwindMachine* machine){
-    machine->registers.a = memory_readb(machine, n_helper(machine));
+    machine->registers.a = memory_readb(machine, 0xFF00 + n_helper(machine));
 }
 
 void ldd_hl_a(ElwindMachine* machine){
@@ -118,9 +193,48 @@ void ldd_hl_a(ElwindMachine* machine){
     zero_helper(machine, get_hl_helper(machine));
 }
 
+void ldi_hl_a(ElwindMachine* machine){
+    memory_writeb(machine, get_hl_helper(machine), machine->registers.a);
+    set_hl_helper(machine, get_hl_helper(machine) + 1);
+    if (get_hl_helper(machine) == 0){
+        machine->registers.f |= BIT(FLAG_CARRY);
+    }
+    else machine->registers.f &= ~(BIT(FLAG_CARRY));
+    zero_helper(machine, get_hl_helper(machine));
+}
+
+void and_a(ElwindMachine* machine){
+    machine->registers.a = machine->registers.a & machine->registers.a;
+    zero_helper(machine, machine->registers.a);
+}
+
 void xor_a(ElwindMachine* machine){
     machine->registers.a = machine->registers.a ^ machine->registers.a;
     zero_helper(machine, machine->registers.a);
+}
+
+void or_b(ElwindMachine* machine){
+    machine->registers.a = machine->registers.a | machine->registers.b;
+    zero_helper(machine, machine->registers.a);
+}
+
+void or_c(ElwindMachine* machine){
+    machine->registers.a = machine->registers.a | machine->registers.c;
+    zero_helper(machine, machine->registers.a);
+}
+
+void inc_de(ElwindMachine* machine){
+    static uint16_t de;
+    de = get_de_helper(machine);
+    inc_helper_16(machine, &de);
+    set_de_helper(machine, de);
+}
+
+void dec_bc(ElwindMachine* machine){
+    static uint16_t bc;
+    bc = get_bc_helper(machine);
+    dec_helper_16(machine, &bc);
+    set_bc_helper(machine, bc);
 }
 
 void dec_b(ElwindMachine* machine){
@@ -133,6 +247,7 @@ void dec_c(ElwindMachine* machine){
 
 void cp_n(ElwindMachine* machine){
     uint8_t n = n_helper(machine);
+    printf("n: 0x%x\n", n);
     if (machine->registers.a == n) machine->registers.f |= BIT(FLAG_ZERO);
     else machine->registers.f &= ~(BIT(FLAG_ZERO));
     if (machine->registers.a < n) machine->registers.f |= BIT(FLAG_CARRY);
@@ -144,7 +259,7 @@ void cp_n(ElwindMachine* machine){
 
 const ElwindInstruction Instructions[256] = {
     { "NOP\n", 1, nop },
-    { "NULL", 1, NULL },
+    { "LD BC, nn\n", 3, ld_bc_nn },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
@@ -154,22 +269,22 @@ const ElwindInstruction Instructions[256] = {
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
-    { "NULL", 1, NULL },
+    { "DEC BC\n", 1, dec_bc },
     { "NULL", 1, NULL },
     { "DEC C\n", 1, dec_c },
     { "LD C, n\n", 2, ld_c_n },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
+    { "LD DE, nn\n", 3, ld_de_nn },
+    { "NULL", 1, NULL },
+    { "INC DE\n", 1, inc_de },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
+    { "JR n\n", 2, jr_n },
     { "NULL", 1, NULL },
-    { "NULL", 1, NULL },
-    { "NULL", 1, NULL },
-    { "NULL", 1, NULL },
-    { "NULL", 1, NULL },
-    { "NULL", 1, NULL },
+    { "LD A, (DE)\n", 1, ld_a_de },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
@@ -177,7 +292,7 @@ const ElwindInstruction Instructions[256] = {
     { "NULL", 1, NULL },
     { "JR NZ, n\n", 2, jr_nz_n },
     { "LD HL, nn\n", 3, ld_hl_nn },
-    { "NULL", 1, NULL },
+    { "LDI (HL), A\n", 1, ldi_hl_a },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
@@ -199,7 +314,7 @@ const ElwindInstruction Instructions[256] = {
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
-    { "NULL", 1, NULL },
+    { "JR C, n\n", 2, jr_c_n },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
@@ -263,6 +378,7 @@ const ElwindInstruction Instructions[256] = {
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
+    { "LD A, B\n", 1, ld_a_b },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
@@ -309,8 +425,7 @@ const ElwindInstruction Instructions[256] = {
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
-    { "NULL", 1, NULL },
-    { "NULL", 1, NULL },
+    { "AND A\n", 1, and_a },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
@@ -319,8 +434,8 @@ const ElwindInstruction Instructions[256] = {
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "XOR A\n", 1, xor_a },
-    { "NULL", 1, NULL },
-    { "NULL", 1, NULL },
+    { "OR B\n", 1, or_b },
+    { "OR C\n", 1, or_c },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
     { "NULL", 1, NULL },
