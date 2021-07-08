@@ -2,6 +2,7 @@
 
 #include <signal.h>
 #include <string.h>
+#include <time.h>
 
 ElwindMachine Machine;
 
@@ -69,11 +70,15 @@ void mainloop(){
             if (!strcmp(buffer, "\n")){
                 memcpy(buffer, last_buffer, 512);
             }
-            else{
+            else {
                 memcpy(last_buffer, buffer, 512);
             }
             if (!strcmp(buffer, "s\n")){
                 Process();
+            }
+            if (!strcmp(buffer, "d\n")){
+                FillTileCache(&Machine);
+                DrawBackground(&Machine);
             }
             if (!strcmp(buffer, "c\n")){
                 stopped = 0;
@@ -104,13 +109,11 @@ void mainloop(){
             }
         }
         else Process();
-        FillTileCache(&Machine);
     }
     FillTileCache(&Machine);
-    PrintTile(&Machine, 0x65);
-    for (int i = 0; i < 8; i++){
-        DrawTileAt(&Machine, i+0x65, (i*8), 0);
-    }
+
+    //DrawBackground(&Machine);
+
     FILE* vram = fopen("vram.bin", "wb+");
     for (int c = 0; c < 0x2000; c++){
         fputc(Machine.memory.VRAM[c], vram);
@@ -119,9 +122,10 @@ void mainloop(){
 }
 
 int main(int argc, char** argv){
+    srand(time(NULL));
     Machine.registers.pc = PC_START;
     FILE* ROMHandle;
-    ROMHandle = fopen("hello-world.gb", "r");
+    ROMHandle = fopen("tetris.gb", "r");
     fread(Machine.memory.Memory, sizeof(char), ROM_SIZE, ROMHandle);
     printf("Loaded first 32KiB of ROM into machine's memory\n");
     signal(SIGINT, break_ctrl_c);

@@ -28,10 +28,22 @@ void PutPixelAt(ElwindMachine* machine, uint16_t x, uint16_t y, uint8_t color){
 }
 
 void Draw(ElwindMachine* machine){
-    SDL_UpdateTexture(machine->renderer.texture, NULL, machine->renderer.Framebuffer, 160*sizeof(uint32_t));
+    SDL_UpdateTexture(machine->renderer.texture, NULL, machine->renderer.Framebuffer, SIZE_Y*sizeof(uint32_t));
     SDL_RenderClear(machine->renderer.renderer);
     SDL_RenderCopy(machine->renderer.renderer, machine->renderer.texture, NULL, NULL);
     SDL_RenderPresent(machine->renderer.renderer);
+}
+
+void UpdateBackgroundMap(ElwindMachine* machine){
+    memcpy(machine->renderer.Background, machine->memory.VRAM+0x1800, 1024);
+}
+
+void DrawBackground(ElwindMachine* machine){
+    UpdateBackgroundMap(machine);
+    for (uint16_t i = 0; i < 1024; i++){
+        DrawTileAt(machine, machine->renderer.Background[i], (i*8) % 256, (i / 32)*8);
+        if (machine->renderer.Background[i]) printf("x: 0x%x, y: 0x%x, tile: 0x%x\n", (i*8) % 256, ((i*8) / 256)*8, machine->renderer.Background[i]);
+    }
 }
 
 void DrawTileAt(ElwindMachine* machine, uint8_t tileno, uint16_t xoff, uint16_t yoff){
@@ -62,7 +74,7 @@ int InitSDL2(ElwindMachine* machine){
         printf("Error initializing SDL2: %s\n", SDL_GetError());
         return 1;
     }
-    SDL_Window* window = SDL_CreateWindow("Elwind", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 160, 144, 0);
+    SDL_Window* window = SDL_CreateWindow("Elwind", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SIZE_Y, SIZE_X, 0);
     if (!window) {
         printf("Could not create SDL2 window\n");
         return 1;
@@ -74,7 +86,7 @@ int InitSDL2(ElwindMachine* machine){
         return 1;
     }
     machine->renderer.renderer = renderer;
-    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, 160, 144);
+    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, SIZE_Y, SIZE_X);
     if (!texture){
         printf("Could not create a ARGB texture\n");
     }

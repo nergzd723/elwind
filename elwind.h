@@ -11,8 +11,8 @@
 #define ROM_SIZE 0x8000
 
 #define LCDC_Y 0x44
-#define SIZE_X 144
-#define SIZE_Y 160
+#define SIZE_X 256
+#define SIZE_Y 256
 
 #define FLAG_ZERO 7
 #define FLAG_NEGATIVE 6
@@ -36,18 +36,19 @@ typedef struct {
 } ElwindRegisters;
 
 typedef struct {
-    char Memory[0xFFFF];
-    char VRAM[0x2000];
-    char OAM[0xFF];
-    char IOMemory[0x7F];
+    uint8_t Memory[0xFFFF];
+    uint8_t VRAM[0x2000];
+    uint8_t OAM[0xFF];
+    uint8_t IOMemory[0x7F];
 } ElwindMemory;
 
 typedef struct {
-    char Tiles[256][16];
+    uint8_t Tiles[256][16];
+    uint8_t Background[1024];
     SDL_Window* window;
     SDL_Renderer* renderer;
     SDL_Texture* texture;
-    uint8_t Framebuffer[160*144*4];
+    uint8_t Framebuffer[SIZE_Y*SIZE_X*4];
 } ElwindRenderer;
 
 typedef struct {
@@ -70,6 +71,7 @@ enum Shade{
 };
 
 extern const ElwindInstruction Instructions[256];
+extern const ElwindInstruction PrefixedInstructions[256];
 
 static char broken;
 static char stopped = 1;
@@ -78,5 +80,6 @@ void FillTileCache(ElwindMachine* machine);
 void PrintTile(ElwindMachine* machine, uint8_t tileno);
 int InitSDL2(ElwindMachine* machine);
 void DrawTileAt(ElwindMachine* machine, uint8_t tileno, uint16_t xoff, uint16_t yoff);
+void DrawBackground(ElwindMachine* machine);
 
 #endif
