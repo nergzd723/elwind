@@ -53,9 +53,16 @@ void die(int signal){
 void mainloop(){
     char buffer[512];
     char last_buffer[512];
+    uint16_t breakpoints[10];
 
     ElwindInstruction next_instruction;
     while (!broken){
+        for (uint8_t i = 0; i < 9; i++){
+            if (breakpoints[i] == Machine.registers.pc){
+                stopped++;
+                breakpoints[i] = 0;
+            }
+        }
         if (stopped){
             fputs(">>> ", stdout);
             fgets(buffer, 512, stdin);
@@ -89,6 +96,11 @@ void mainloop(){
                     fputc(Machine.memory.VRAM[c], vram);
                 }
                 printf("Crashdump done!\n");
+            }
+            if (buffer[0] == 'b') {
+                uint16_t integer = (uint16_t) strtol(buffer+2, NULL, 0);
+                uint8_t breakpoint_index = strlen((char*)breakpoints) / 2;
+                breakpoints[breakpoint_index] = integer;
             }
         }
         else Process();
