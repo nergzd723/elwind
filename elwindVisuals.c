@@ -1,6 +1,6 @@
 #include "elwind.h"
-
 #include <string.h>
+#include <time.h>
 
 void FillTileCache(ElwindMachine* machine){
     for(uint16_t tileIndex = 0; tileIndex < 256; tileIndex++){
@@ -39,11 +39,14 @@ void UpdateBackgroundMap(ElwindMachine* machine){
 }
 
 void DrawBackground(ElwindMachine* machine){
+    clock_t begin = clock();
+
     UpdateBackgroundMap(machine);
     for (uint16_t i = 0; i < 1024; i++){
         DrawTileAt(machine, machine->renderer.Background[i], (i*8) % 256, (i / 32)*8);
-        if (machine->renderer.Background[i]) printf("x: 0x%x, y: 0x%x, tile: 0x%x\n", (i*8) % 256, ((i*8) / 256)*8, machine->renderer.Background[i]);
+        //if (machine->renderer.Background[i]) printf("x: 0x%x, y: 0x%x, tile: 0x%x\n", (i*8) % 256, ((i*8) / 256)*8, machine->renderer.Background[i]);
     }
+    Draw(machine);
 }
 
 void DrawTileAt(ElwindMachine* machine, uint8_t tileno, uint16_t xoff, uint16_t yoff){
@@ -65,8 +68,6 @@ void DrawTileAt(ElwindMachine* machine, uint8_t tileno, uint16_t xoff, uint16_t 
             else PutPixelAt(machine, column+xoff, row+yoff, SHADE_BLACK);
         }
     }
-
-    Draw(machine);
 }
 
 int InitSDL2(ElwindMachine* machine){
@@ -74,7 +75,7 @@ int InitSDL2(ElwindMachine* machine){
         printf("Error initializing SDL2: %s\n", SDL_GetError());
         return 1;
     }
-    SDL_Window* window = SDL_CreateWindow("Elwind", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SIZE_Y, SIZE_X, 0);
+    SDL_Window* window = SDL_CreateWindow("Elwind", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SIZE_Y*2, SIZE_X*2, 0);
     if (!window) {
         printf("Could not create SDL2 window\n");
         return 1;
