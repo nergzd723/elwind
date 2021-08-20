@@ -102,6 +102,7 @@ void mainloop(){
                 stopped++;
             }
         }
+        if (Machine.registers.pc == 0x1c37) stopped = 1;
         if (stopped){
             fputs(">>> ", stdout);
             fgets(buffer, 512, stdin);

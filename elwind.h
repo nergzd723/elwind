@@ -8,9 +8,26 @@
 #define PIXEL_SIZE 4 // ARGB, 4 bytes
 
 #define PC_START 0x100
-#define ROM_SIZE 0x8000
+#define ROM_BASE_SIZE 0x4000
 
+#define LCDC_CTRL 0x40
 #define LCDC_Y 0x44
+
+#define SERIAL_WRITE 0x1
+#define SERIAL_CTRL 0x2
+#define SERIAL_TRANSFER_START 7
+#define SERIAL_CLOCK_SPEED 1
+#define SERIAL_CLOCKSOURCE 0
+
+#define LCDC_CTRL_EN 7
+#define LCDC_CTRL_TILEMAP_MAP 6
+#define LCDC_CTRL_WINDOW_EN 5
+#define LCDC_CTRL_BG_SELECT 4
+#define LCDC_CTRL_BG_TILEMAP 3
+#define LCDC_CTRL_SPRITE_SIZE 2
+#define LCDC_CTRL_SPRITE_EN 1
+#define LCDC_CTRL_BG_WINDOW_PRIORITY 0
+
 #define SIZE_X 256
 #define SIZE_Y 256
 
@@ -21,6 +38,13 @@
 
 #define BIT(n) (1 << n)
 
+enum MBCMode{
+    MBC_MODE_NONE,
+    MBC_MODE_MBC1,
+    MBC_MODE_MBC2,
+    MBC_MODE_MBC3,
+    MBC_MODE_MBC5,
+};
 
 typedef struct {
     uint8_t a;
@@ -40,6 +64,7 @@ typedef struct {
     uint8_t VRAM[0x2000];
     uint8_t OAM[0xFF];
     uint8_t IOMemory[0x7F];
+    enum MBCMode banking_mode;
 } ElwindMemory;
 
 typedef struct {
@@ -55,6 +80,7 @@ typedef struct {
     ElwindRegisters registers;
     ElwindMemory memory;
     ElwindRenderer renderer;
+    FILE* ElwindROM;
 } ElwindMachine;
 
 typedef struct {
@@ -81,5 +107,6 @@ void PrintTile(ElwindMachine* machine, uint8_t tileno);
 int InitSDL2(ElwindMachine* machine);
 void DrawTileAt(ElwindMachine* machine, uint8_t tileno, uint16_t xoff, uint16_t yoff);
 void DrawBackground(ElwindMachine* machine);
+void mbc1_handler(ElwindMachine* machine, uint16_t address, uint8_t val);
 
 #endif
