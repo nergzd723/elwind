@@ -73,7 +73,7 @@ typedef struct {
     SDL_Window* window;
     SDL_Renderer* renderer;
     SDL_Texture* texture;
-    uint8_t Framebuffer[SIZE_Y*SIZE_X*4];
+    uint8_t Framebuffer[SIZE_Y*SIZE_X*PIXEL_SIZE + PIXEL_SIZE];
 } ElwindRenderer;
 
 typedef struct {
@@ -108,5 +108,8 @@ int InitSDL2(ElwindMachine* machine);
 void DrawTileAt(ElwindMachine* machine, uint8_t tileno, uint16_t xoff, uint16_t yoff);
 void DrawBackground(ElwindMachine* machine);
 void mbc1_handler(ElwindMachine* machine, uint16_t address, uint8_t val);
+void setupCodegen();
+void runJIT(ElwindMachine* machine);
+void ProcessInterrupt(ElwindMachine* machine);
 
 #endif

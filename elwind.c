@@ -4,9 +4,6 @@
 #include <string.h>
 #include <time.h>
 
-long long ms_now;
-long long ms_old;
-
 ElwindMachine Machine;
 
 void InitializeHardware(){
@@ -21,7 +18,7 @@ ElwindInstruction FetchInstruction(){
 }
 
 int ExecuteInstruction(ElwindMachine* machine, ElwindInstruction instruction){
-    if (instruction.Execute == NULL){
+    if (instruction.Execute == NULL) {
         printf("\nError: instruction not implemented\n");
         printf("Instruction 0x%x, at 0x%x\n", (uint8_t)(Machine.memory.Memory[Machine.registers.pc]), Machine.registers.pc);
         printf("Fatal error!\n");
@@ -31,35 +28,6 @@ int ExecuteInstruction(ElwindMachine* machine, ElwindInstruction instruction){
         instruction.Execute(machine);
         machine->registers.pc += instruction.length;
         return 0;
-    }
-}
-
-void ProcessInterrupt() {
-    
-    if (Machine.memory.Memory[0xFFFE] == 1){
-#ifdef PROFILING
-        clock_t begin = clock();
-#endif
-        FillTileCache(&Machine);
-        DrawBackground(&Machine);
-#ifdef PROFILING
-        clock_t end = clock();
-        double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-        printf("Total time spent drawing: %.6fs\n", time_spent);
-#endif
-        struct timespec time_now;
-        clock_gettime(1, &time_now);
-        ms_now = time_now.tv_sec*1000 + time_now.tv_nsec / 1e6;
-        if ((ms_now - ms_old) > 100){
-
-            if (Machine.memory.Memory[Machine.registers.pc] == 0x76) Machine.registers.pc++;
-            Machine.registers.sp -= 2;
-            Machine.memory.Memory[Machine.registers.sp] = Machine.registers.pc & 0xFF;
-            Machine.memory.Memory[Machine.registers.sp+1] = Machine.registers.pc >> 8;
-            Machine.registers.pc = 0x40;
-            ms_old = ms_now;
-            Machine.memory.Memory[0xFFFE] = 0;
-        }
     }
 }
 
@@ -74,7 +42,7 @@ void Process(){
         printf("%s", next_instruction.info);
     }
     broken = ExecuteInstruction(&Machine, next_instruction);
-    ProcessInterrupt();
+    ProcessInterrupt(&Machine);
 }
 
 void break_ctrl_c(int signal){
@@ -93,7 +61,7 @@ void die(int signal){
 void mainloop(){
     char buffer[512];
     char last_buffer[512];
-    short breakpoints[10] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+    short breakpoints[10];
 
     ElwindInstruction next_instruction;
     while (!broken){
@@ -102,9 +70,10 @@ void mainloop(){
                 stopped++;
             }
         }
-        if (Machine.registers.pc == 0x1c37) stopped = 1;
+        //if (Machine.registers.pc == 0x641) stopped = 1;
         if (stopped){
             fputs(">>> ", stdout);
+            fflush(stdout);
             fgets(buffer, 512, stdin);
             if (!strcmp(buffer, "\n")){
                 memcpy(buffer, last_buffer, 512);
@@ -166,6 +135,10 @@ void mainloop(){
                 uint8_t breakpoint_index = strlen((char*)breakpoints) / 2;
                 breakpoints[breakpoint_index] = integer;
             }
+            if (buffer[0] == 'j') {
+                setupCodegen();
+                runJIT(&Machine);
+            }
         }
         else Process();
     }
@@ -182,9 +155,11 @@ int main(int argc, char** argv){
     srand(time(NULL));
     Machine.registers.pc = PC_START;
     FILE* ROMHandle;
+/*
     struct timespec old_time;
     clock_gettime(1, &old_time);
     ms_old = old_time.tv_sec*1000 + old_time.tv_nsec / 1e6;
+*/
     ROMHandle = fopen("smland.gb", "r");
     Machine.ElwindROM = ROMHandle;
     fread(Machine.memory.Memory, sizeof(char), ROM_BASE_SIZE, ROMHandle);

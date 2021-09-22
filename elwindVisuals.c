@@ -55,7 +55,7 @@ void DrawTileAt(ElwindMachine* machine, uint8_t tileno, uint16_t xoff, uint16_t 
     for(uint8_t row = 0; row < 8; row++){
         byte1 = machine->renderer.Tiles[tileno][row*2+1];
         byte2 = machine->renderer.Tiles[tileno][row*2];
-        for(uint8_t column = 0; column < 8; column++){
+        for(uint8_t column = 8; column > 0; column--){
             if(byte1 & BIT((8-column)) && byte2 & BIT((8-column))){
                 PutPixelAt(machine, column+xoff, row+yoff, SHADE_WHITE);
             }
