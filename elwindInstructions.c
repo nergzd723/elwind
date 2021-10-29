@@ -58,10 +58,9 @@ uint8_t io_write_handler(ElwindMachine* machine, uint8_t address, uint8_t value)
         case 0x7:
             uint8_t lower_2_bits  = value & 0x3; // 0000 0011
             printf("lower 2 bits: 0x%x, value: 0x%x\n", lower_2_bits, value);
-            getc(stdin);
+            //getc(stdin);
         case 0x6:
             printf("value: 0x%x\n", value);
-            getc(stdin);
         default:
             printf("Warning: WRITING unimplemented I/O region!\n");
             printf("WRITING I/O register 0x%x is not implemented!\n", address);
@@ -130,42 +129,6 @@ uint16_t nn_helper(ElwindMachine* machine){
 
 uint8_t n_helper(ElwindMachine* machine){
     return (uint8_t)machine->memory.Memory[machine->registers.pc+1];
-}
-
-void set_hl_helper(ElwindMachine* machine, uint16_t value){
-    machine->registers.h = (value & 0xFF00) >> 8;
-    machine->registers.l = value & 0xFF;
-}
-
-uint16_t get_hl_helper(ElwindMachine* machine){
-    return (machine->registers.h << 8) | machine->registers.l;
-}
-
-void set_de_helper(ElwindMachine* machine, uint16_t value){
-    machine->registers.d = (value & 0xFF00) >> 8;
-    machine->registers.e = value & 0xFF;
-}
-
-uint16_t get_de_helper(ElwindMachine* machine){
-    return (machine->registers.d << 8) | machine->registers.e;
-}
-
-void set_bc_helper(ElwindMachine* machine, uint16_t value){
-    machine->registers.b = (value & 0xFF00) >> 8;
-    machine->registers.c = value & 0xFF;
-}
-
-uint16_t get_bc_helper(ElwindMachine* machine){
-    return (machine->registers.b << 8) | machine->registers.c;
-}
-
-void set_af_helper(ElwindMachine* machine, uint16_t value){
-    machine->registers.a = (value & 0xFF00) >> 8;
-    machine->registers.f = value & 0xFF;
-}
-
-uint16_t get_af_helper(ElwindMachine* machine){
-    return (machine->registers.a << 8) | machine->registers.f;
 }
 
 void dec_helper(ElwindMachine* machine, uint8_t* targetRegister){
@@ -259,7 +222,7 @@ void jp_nc_nn(ElwindMachine* machine){
 }
 
 void jp_hl(ElwindMachine* machine){
-    machine->registers.pc = get_hl_helper(machine);
+    machine->registers.pc = machine->registers.hl;
 }
 
 void jr_nz_n(ElwindMachine* machine){
@@ -298,19 +261,19 @@ void ld_sp_nn(ElwindMachine* machine){
 }
 
 void ld_hl_nn(ElwindMachine* machine){
-    set_hl_helper(machine, nn_helper(machine));
+    machine->registers.hl = nn_helper(machine);
 }
 
 void ld_de_a(ElwindMachine* machine){
-    memory_writeb(machine, get_de_helper(machine), machine->registers.a);
+    memory_writeb(machine, machine->registers.de, machine->registers.a);
 }
 
 void ld_de_nn(ElwindMachine* machine){
-    set_de_helper(machine, nn_helper(machine));
+    machine->registers.de = nn_helper(machine);
 }
 
 void ld_bc_nn(ElwindMachine* machine){
-    set_bc_helper(machine, nn_helper(machine));
+    machine->registers.bc = nn_helper(machine);
 }
 
 void ld_a_n(ElwindMachine* machine){
@@ -375,15 +338,15 @@ void ld_e_n(ElwindMachine* machine){
 }
 
 void ld_a_de(ElwindMachine* machine){
-    machine->registers.a = memory_readb(machine, get_de_helper(machine));
+    machine->registers.a = memory_readb(machine, machine->registers.de);
 }
 
 void ld_a_bc(ElwindMachine* machine){
-    machine->registers.a = memory_readb(machine, get_bc_helper(machine));
+    machine->registers.a = memory_readb(machine, machine->registers.bc);
 }
 
 void ld_a_hl(ElwindMachine* machine){
-    machine->registers.a = memory_readb(machine, get_hl_helper(machine));
+    machine->registers.a = memory_readb(machine, machine->registers.hl);
 }
 
 void ld_a_nn(ElwindMachine* machine){
@@ -391,15 +354,15 @@ void ld_a_nn(ElwindMachine* machine){
 }
 
 void ld_e_hl(ElwindMachine* machine){
-    machine->registers.e = memory_readb(machine, get_hl_helper(machine));
+    machine->registers.e = memory_readb(machine, machine->registers.hl);
 }
 
 void ld_d_hl(ElwindMachine* machine){
-    machine->registers.d = memory_readb(machine, get_hl_helper(machine));
+    machine->registers.d = memory_readb(machine, machine->registers.hl);
 }
 
 void ld_h_hl(ElwindMachine* machine){
-    machine->registers.h = memory_readb(machine, get_hl_helper(machine));
+    machine->registers.h = memory_readb(machine, machine->registers.hl);
 }
 
 void ld_h_a(ElwindMachine* machine){
@@ -439,7 +402,7 @@ void ld_nn_a(ElwindMachine* machine){
 }
 
 void ld_hl_n(ElwindMachine* machine){
-    memory_writeb(machine, get_hl_helper(machine), n_helper(machine));
+    memory_writeb(machine, machine->registers.hl, n_helper(machine));
 }
 
 void ldh_n_a(ElwindMachine* machine){
@@ -464,43 +427,41 @@ void ld_d_n(ElwindMachine* machine){
 }
 
 void ldd_hl_a(ElwindMachine* machine){
-    memory_writeb(machine, get_hl_helper(machine), machine->registers.a);
-    set_hl_helper(machine, get_hl_helper(machine) - 1);
-    if (get_hl_helper(machine) == UINT16_MAX){
+    memory_writeb(machine, machine->registers.hl, machine->registers.a);
+    machine->registers.hl = machine->registers.hl - 1;
+    if (machine->registers.hl == UINT16_MAX){
         machine->registers.f |= BIT(FLAG_CARRY);
     }
     else machine->registers.f &= ~(BIT(FLAG_CARRY));
-    zero_helper(machine, get_hl_helper(machine));
+    zero_helper(machine, machine->registers.hl);
 }
 
 void ldi_hl_a(ElwindMachine* machine){
-    memory_writeb(machine, get_hl_helper(machine), machine->registers.a);
-    set_hl_helper(machine, get_hl_helper(machine) + 1);
-    if (get_hl_helper(machine) == 0){
+    memory_writeb(machine, machine->registers.hl, machine->registers.a);
+    machine->registers.hl = machine->registers.hl + 1;
+    if (machine->registers.hl == 0){
         machine->registers.f |= BIT(FLAG_CARRY);
     }
     else machine->registers.f &= ~(BIT(FLAG_CARRY));
-    zero_helper(machine, get_hl_helper(machine));
+    zero_helper(machine, machine->registers.hl);
 }
 
 void ld_hl_a(ElwindMachine* machine){
-    memory_writeb(machine, get_hl_helper(machine), machine->registers.a);
+    memory_writeb(machine, machine->registers.hl, machine->registers.a);
 }
 
 void ld_hl_b(ElwindMachine* machine){
-    memory_writeb(machine, get_hl_helper(machine), machine->registers.b);
+    memory_writeb(machine, machine->registers.hl, machine->registers.b);
 }
 
 void ldi_a_hl(ElwindMachine* machine){
-    uint16_t hl = get_hl_helper(machine);
-    machine->registers.a = memory_readb(machine, hl);
-    hl++;
-    set_hl_helper(machine, hl);
-    if (hl == 0){
+    machine->registers.a = memory_readb(machine, machine->registers.hl);
+    machine->registers.hl++;
+    if (machine->registers.hl == 0){
         machine->registers.f |= BIT(FLAG_CARRY);
     }
     else machine->registers.f &= ~(BIT(FLAG_CARRY));
-    zero_helper(machine, hl);
+    zero_helper(machine, machine->registers.hl);
 }
 
 void inc_a(ElwindMachine* machine){
@@ -548,26 +509,26 @@ void call_z_nn(ElwindMachine* machine){
 
 void push_af(ElwindMachine* machine){
     machine->registers.sp -= 2;
-    memory_writeb(machine, machine->registers.sp, (get_af_helper(machine)) & 0xFF);
-    memory_writeb(machine, machine->registers.sp+1, (get_af_helper(machine)) >> 8);
+    memory_writeb(machine, machine->registers.sp, (machine->registers.af) & 0xFF);
+    memory_writeb(machine, machine->registers.sp+1, (machine->registers.af) >> 8);
 }
 
 void push_bc(ElwindMachine* machine){
     machine->registers.sp -= 2;
-    memory_writeb(machine, machine->registers.sp, (get_bc_helper(machine)) & 0xFF);
-    memory_writeb(machine, machine->registers.sp+1, (get_bc_helper(machine)) >> 8);
+    memory_writeb(machine, machine->registers.sp, (machine->registers.bc) & 0xFF);
+    memory_writeb(machine, machine->registers.sp+1, (machine->registers.bc) >> 8);
 }
 
 void push_de(ElwindMachine* machine){
     machine->registers.sp -= 2;
-    memory_writeb(machine, machine->registers.sp, (get_de_helper(machine)) & 0xFF);
-    memory_writeb(machine, machine->registers.sp+1, (get_de_helper(machine)) >> 8);
+    memory_writeb(machine, machine->registers.sp, (machine->registers.de) & 0xFF);
+    memory_writeb(machine, machine->registers.sp+1, (machine->registers.de) >> 8);
 }
 
 void push_hl(ElwindMachine* machine){
     machine->registers.sp -= 2;
-    memory_writeb(machine, machine->registers.sp, (get_hl_helper(machine)) & 0xFF);
-    memory_writeb(machine, machine->registers.sp+1, (get_hl_helper(machine)) >> 8);
+    memory_writeb(machine, machine->registers.sp, (machine->registers.hl) & 0xFF);
+    memory_writeb(machine, machine->registers.sp+1, (machine->registers.hl) >> 8);
 }
 
 void rst_8(ElwindMachine* machine){
@@ -664,37 +625,37 @@ void res_5_c(ElwindMachine* machine){
 
 void inc_de(ElwindMachine* machine){
     static uint16_t de;
-    de = get_de_helper(machine);
+    de = machine->registers.de;
     inc_helper_16(machine, &de);
-    set_de_helper(machine, de);
+    machine->registers.de = de;
 }
 
 void inc_hl(ElwindMachine* machine){
     static uint16_t hl;
-    hl = get_hl_helper(machine);
+    hl = machine->registers.hl;
     inc_helper_16(machine, &hl);
-    set_hl_helper(machine, hl);
+    machine->registers.hl = hl;
 }
 
 void inc_at_hl(ElwindMachine* machine){
     static uint8_t at_hl;
-    at_hl = memory_readb(machine, get_hl_helper(machine));
+    at_hl = memory_readb(machine, machine->registers.hl);
     inc_helper(machine, &at_hl);
-    memory_writeb(machine, get_hl_helper(machine), at_hl);
+    memory_writeb(machine, machine->registers.hl, at_hl);
 }
 
 void dec_bc(ElwindMachine* machine){
     static uint16_t bc;
-    bc = get_bc_helper(machine);
+    bc = machine->registers.bc;
     dec_helper_16(machine, &bc);
-    set_bc_helper(machine, bc);
+    machine->registers.bc = bc;
 }
 
 void dec_at_hl(ElwindMachine* machine){
     static uint8_t at_hl;
-    at_hl = memory_readb(machine, get_hl_helper(machine));
+    at_hl = memory_readb(machine, machine->registers.hl);
     dec_helper(machine, &at_hl);
-    memory_writeb(machine, get_hl_helper(machine), at_hl);
+    memory_writeb(machine, machine->registers.hl, at_hl);
 }
 
 void dec_a(ElwindMachine* machine){
@@ -734,18 +695,18 @@ void add_a_n(ElwindMachine* machine){
 }
 
 void add_hl_de(ElwindMachine* machine){
-    uint16_t old_value = get_hl_helper(machine);
-    set_hl_helper(machine, get_hl_helper(machine) + get_de_helper(machine));
-    if (get_hl_helper(machine) < old_value){
+    uint16_t old_value = machine->registers.hl;
+    machine->registers.hl = machine->registers.hl + machine->registers.de;
+    if (machine->registers.hl < old_value){
         machine->registers.f |= BIT(FLAG_CARRY);
     }
     else machine->registers.f &= ~(BIT(FLAG_CARRY));
 }
 
 void add_hl_bc(ElwindMachine* machine){
-    uint16_t old_value = get_hl_helper(machine);
-    set_hl_helper(machine, get_hl_helper(machine) + get_bc_helper(machine));
-    if (get_hl_helper(machine) < old_value){
+    uint16_t old_value = machine->registers.hl;
+    machine->registers.hl = machine->registers.hl + machine->registers.bc;
+    if (machine->registers.hl < old_value){
         machine->registers.f |= BIT(FLAG_CARRY);
     }
     else machine->registers.f &= ~(BIT(FLAG_CARRY));
@@ -756,7 +717,7 @@ void ldhl_sp_d(ElwindMachine* machine){
     sp += n_helper(machine);
     if (machine->registers.sp < sp) machine->registers.f |= BIT(FLAG_CARRY);
     else machine->registers.f &= ~(BIT(FLAG_CARRY));
-    set_hl_helper(machine, sp);
+    machine->registers.hl = sp;
 }
 
 void cp_n(ElwindMachine* machine){
@@ -794,7 +755,7 @@ void cp_c(ElwindMachine* machine){
 }
 
 void cp_hl(ElwindMachine* machine){
-    uint8_t n = memory_readb(machine, get_hl_helper(machine));
+    uint8_t n = memory_readb(machine, machine->registers.hl);
     if (machine->registers.a == n) machine->registers.f |= BIT(FLAG_ZERO);
     else machine->registers.f &= ~(BIT(FLAG_ZERO));
     if (machine->registers.a < n) machine->registers.f |= BIT(FLAG_CARRY);
@@ -849,22 +810,22 @@ void ret_nc(ElwindMachine* machine){
 }
 
 void pop_af(ElwindMachine* machine){
-    set_af_helper(machine, (memory_readb(machine, machine->registers.sp + 1) << 8) | memory_readb(machine, machine->registers.sp));
+    machine->registers.af = (memory_readb(machine, machine->registers.sp + 1) << 8) | memory_readb(machine, machine->registers.sp);
     machine->registers.sp += 2;
 }
 
 void pop_bc(ElwindMachine* machine){
-    set_bc_helper(machine, (memory_readb(machine, machine->registers.sp + 1) << 8) | memory_readb(machine, machine->registers.sp));
+    machine->registers.bc = (memory_readb(machine, machine->registers.sp + 1) << 8) | memory_readb(machine, machine->registers.sp);
     machine->registers.sp += 2;
 }
 
 void pop_de(ElwindMachine* machine){
-    set_de_helper(machine, (memory_readb(machine, machine->registers.sp + 1) << 8) | memory_readb(machine, machine->registers.sp));
+    machine->registers.de = (memory_readb(machine, machine->registers.sp + 1) << 8) | memory_readb(machine, machine->registers.sp);
     machine->registers.sp += 2;
 }
 
 void pop_hl(ElwindMachine* machine){
-    set_hl_helper(machine, (memory_readb(machine, machine->registers.sp + 1) << 8) | memory_readb(machine, machine->registers.sp));
+    machine->registers.hl = (memory_readb(machine, machine->registers.sp + 1) << 8) | memory_readb(machine, machine->registers.sp);
     machine->registers.sp += 2;
 }
 
@@ -885,9 +846,9 @@ void exec_prefixed(ElwindMachine* machine){
 }
 
 void set_3_hl(ElwindMachine* machine){
-    uint8_t value = memory_readb(machine, get_hl_helper(machine));
+    uint8_t value = memory_readb(machine, machine->registers.hl);
     value = value | BIT(3);
-    memory_writeb(machine, get_hl_helper(machine), value);
+    memory_writeb(machine, machine->registers.hl, value);
 }
 
 void set_7_a(ElwindMachine* machine){
@@ -943,7 +904,7 @@ void sbc_helper(ElwindMachine* machine, uint8_t* to_be_sub, uint8_t sub){
 }
 
 void sub_a_hl(ElwindMachine* machine){
-    sub_helper(machine, &machine->registers.a, memory_readb(machine, get_hl_helper(machine)));
+    sub_helper(machine, &machine->registers.a, memory_readb(machine, machine->registers.hl));
 }
 
 void sub_a_b(ElwindMachine* machine){

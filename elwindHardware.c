@@ -46,7 +46,7 @@ void ProcessVsync(ElwindMachine* machine) {
     struct timespec time_now;
     clock_gettime(1, &time_now);
     ms_now = time_now.tv_sec*1000 + time_now.tv_nsec / 1e6;
-    if ((ms_now - ms_old) > 1000){
+    if ((ms_now - ms_old) > 16){
 
         if (machine->memory.Memory[machine->registers.pc] == 0x76) machine->registers.pc++; // if HALT
         machine->registers.sp -= 2;
@@ -86,4 +86,3 @@ void ProcessInterrupt(ElwindMachine* machine) {
         //} // Hack for now, doesn't really work :/
     }
 }
-
